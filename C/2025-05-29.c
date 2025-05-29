@@ -1,9 +1,6 @@
-
 /**
  * Note: The returned array must be malloced, assume caller calls free().
  */
-
-#define INF 1000000000
 
 typedef struct {
   int *data;
@@ -55,7 +52,7 @@ int dequeue(Queue *q) {
   return val;
 }
 
-int isEmpty(Queue *q){
+int isEmpty(Queue *q) {
   return q->size == 0;
 }
 
@@ -63,75 +60,65 @@ void freeQueue(Queue *q) {
   free(q->data);
 }
 
-int calculate(int N, Vector *adj, int node, int k){
-  int *dist = malloc(sizeof(int) * N);
-  for (int i = 0; i < N; i++) dist[i] = INF;
-  dist[node] = 0;
-
+void calculateColors(int** edges, int edgesSize, Vector* adjlist, int* colors) {
+  int N = edgesSize + 1;
+  for (int i = 0; i < edgesSize; i++) {
+    int u = edges[i][0];
+    int v = edges[i][1];
+    pushVector(&adjlist[u], v);
+    pushVector(&adjlist[v], u);
+  }
   Queue q;
   initQueue(&q, N);
-  enqueue(&q, node);
+  colors[0] = 0;
+  enqueue(&q, 0);
 
   while (!isEmpty(&q)) {
-    int curr = dequeue(&q);
-    if (dist[curr] > k) continue;
-    for (int i = 0; i < adj[curr].size; i++){
-      int neighbor = adj[curr].data[i];
-      if (dist[neighbor] > dist[curr] + 1) {
-	dist[neighbor] = dist[curr] + 1;
+    int current = dequeue(&q);
+    for (int i = 0; i < adjlist[current].size; i++) {
+      int neighbor = adjlist[current].data[i];
+      if (colors[neighbor] == -1) {
+	colors[neighbor] = (colors[current] + 1) % 2;
 	enqueue(&q, neighbor);
       }
     }
   }
-  int count = 0;
-  for (int i = 0; i < N; i++) {
-    if (dist[i] <= k) count++;
-  }
-  free(dist);
   freeQueue(&q);
-  return count;
 }
 
-int* maxTargetNodes(int** edges1, int edges1Size, int* edges1ColSize, int** edges2, int edges2Size, int* edges2ColSize, int k, int* returnSize) {
+int* maxTargetNodes(int** edges1, int edges1Size, int* edges1ColSize, int** edges2, int edges2Size, int* edges2ColSize, int* returnSize) {
   int N1 = edges1Size + 1;
   int N2 = edges2Size + 1;
 
-  Vector *e1 = malloc(sizeof(Vector) * N1);
-  Vector *e2 = malloc(sizeof(Vector) * N2);
-
+  Vector* e1 = malloc(sizeof(Vector) * N1);
+  Vector* e2 = malloc(sizeof(Vector) * N2);
   for (int i = 0; i < N1; i++) initVector(&e1[i]);
   for (int i = 0; i < N2; i++) initVector(&e2[i]);
+  
+  int* g1 = malloc(sizeof(int) * N1);
+  int* g2 = malloc(sizeof(int) * N2);
+  for (int i = 0; i < N1; i++) g1[i] = -1;
+  for (int i = 0; i < N2; i++) g2[i] = -1;
+  
+  calculateColors(edges1, edges1Size, e1, g1);
+  calculateColors(edges2, edges2Size, e2, g2);
+  int count1[2] = {0};
+  int count2[2] = {0};
+  for (int i = 0; i < N1; i++) count1[g1[i]]++;
+  for (int i = 0; i < N2; i++) count2[g2[i]]++;
 
-  for (int i = 0; i < edges1Size; i++) {
-    int u = edges1[i][0];
-    int v = edges1[i][1];
-    pushVector(&e1[u], v);
-    pushVector(&e1[v], u);
+  int maxGroup2 = count2[0] > count2[1] ? count2[0] : count2[1];
+
+  int* answer = malloc(sizeof(int) * N1);
+  for (int i = 0; i < N1; i++) {
+    answer[i] = count1[g1[i]] + maxGroup2;
   }
-
-  for (int i = 0; i < edges2Size; i++) {
-    int u = edges2[i][0];
-    int v = edges2[i][1];
-    pushVector(&e2[u], v);
-    pushVector(&e2[v], u);
-  }
-
-  int best2 = 0;
-  for (int node = 0; node < N2; node++) {
-    int val = calculate(N2, e2, node, k - 1);
-    if (val > best2) best2 = val;
-  }
-
-  int *answer = malloc(sizeof(int) * N1);
-  for (int node = 0; node < N1; node++) {
-    answer[node] = calculate(N1, e1, node, k) + best2;
-  }
-
+  
   for (int i = 0; i < N1; i++) freeVector(&e1[i]);
   for (int i = 0; i < N2; i++) freeVector(&e2[i]);
-  free(e1);
-  free(e2);
-  
+  free(e1); free(e2);
+  free(g1); free(g2);
+
   *returnSize = N1;
   return answer;
 }
